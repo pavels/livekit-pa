@@ -1,6 +1,6 @@
 module livekit-pa
 
-go 1.24.1
+go 1.23.1
 
 require (
 	github.com/livekit/protocol v1.32.2-0.20250206110518-331f97dbf4f3
