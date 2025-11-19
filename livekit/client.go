@@ -55,7 +55,7 @@ func (lk *LiveKitClient) Connect() error {
 	room := lksdk.NewRoom(&lksdk.RoomCallback{
 		ParticipantCallback: lksdk.ParticipantCallback{
 			OnTrackSubscribed: func(track *webrtc.TrackRemote, pub *lksdk.RemoteTrackPublication, rp *lksdk.RemoteParticipant) {
-				if track.Codec().MimeType == "audio/opus" {
+				if track.Codec().MimeType == webrtc.MimeTypeOpus {
 					go lk.handleRemoteTrack(track, rp.Identity())
 				}
 			},
@@ -92,7 +92,7 @@ func (lk *LiveKitClient) Disconnect() {
 }
 
 func (lk *LiveKitClient) handleRemoteTrack(track *webrtc.TrackRemote, participantID string) {
-	buf := audio.NewCircularBuffer(960 * 50)
+	buf := audio.NewCircularBuffer()
 	decoder, err := opus.NewDecoder(48000, 1)
 	if err != nil {
 		log.Fatal(err)

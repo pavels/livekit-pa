@@ -3,6 +3,7 @@ module livekit-pa
 go 1.23.1
 
 require (
+	github.com/gen2brain/malgo v0.11.24
 	github.com/livekit/protocol v1.32.2-0.20250206110518-331f97dbf4f3
 	github.com/livekit/server-sdk-go/v2 v2.5.0
 	github.com/pion/webrtc/v4 v4.0.14

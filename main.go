@@ -14,7 +14,7 @@ import (
 )
 
 func main() {
-	driver := flag.String("driver", "alsa", "audio driver: jack or alsa")
+	driver := flag.String("driver", "miniaudio", "audio driver: jack or miniaudio")
 	host := flag.String("host", "", "LiveKit server URL")
 	apiKey := flag.String("api-key", "", "LiveKit API key")
 	apiSecret := flag.String("api-secret", "", "LiveKit API secret")
@@ -26,21 +26,20 @@ func main() {
 		log.Fatal("All LiveKit parameters are required")
 	}
 
-	inputBuffer := audio.NewCircularBuffer(960 * 50)
+	inputBuffer := audio.NewCircularBuffer()
 	outputMixer := audio.NewMixer()
 
+	var err error
 	var client interface {
-		Start() int
+		Start() error
 		Close()
 	}
-
-	var err error
 
 	switch *driver {
 	case "jack":
 		client, err = audio.NewJackClient("livekit-pa-"+*identity, inputBuffer, outputMixer)
-	case "alsa":
-		client, err = audio.NewAlsaClient("default", inputBuffer, outputMixer)
+	case "miniaudio":
+		client, err = audio.NewMalgoClient(inputBuffer, outputMixer)
 	default:
 		log.Fatalf("Unknown driver: %s", *driver)
 	}
@@ -55,8 +54,8 @@ func main() {
 		return lk.Connect()
 	})
 
-	if code := client.Start(); code != 0 {
-		log.Fatalf("Failed to activate audio client: %d", code)
+	if err := client.Start(); err != nil {
+		log.Fatal(err)
 	}
 
 	sigs := make(chan os.Signal, 1)

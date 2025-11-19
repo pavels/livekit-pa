@@ -60,8 +60,13 @@ func NewJackClient(name string, inputBuffer *CircularBuffer, outputMixer *Mixer)
 	return jc, nil
 }
 
-func (jc *JackClient) Start() int {
-	return jc.client.Activate()
+func (jc *JackClient) Start() error {
+	ret := jc.client.Activate()
+	if ret != 0 {
+		return fmt.Errorf("Jack Error: %d", ret)
+	}
+
+	return nil
 }
 
 func (jc *JackClient) Close() {

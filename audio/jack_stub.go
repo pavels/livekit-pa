@@ -14,8 +14,8 @@ func NewJackClient(name string, inputBuffer *CircularBuffer, outputMixer *Mixer)
 	return nil, fmt.Errorf("JACK Support is not compiled.")
 }
 
-func (jc *JackClient) Start() int {
-	return 0
+func (jc *JackClient) Start() error {
+	return nil
 }
 
 func (jc *JackClient) Close() {

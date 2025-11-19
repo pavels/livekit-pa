@@ -1,13 +1,13 @@
 # livekit-pa
 
-`livekit-pa` is a small Go application that bridges [LiveKit](https://livekit.io) audio calls with your local Linux audio system using either ALSA or JACK.
+`livekit-pa` is a small Go application that bridges [LiveKit](https://livekit.io) audio calls with your local Linux audio system using either miniaudio or JACK.
 
 ## Features
 
 - Captures microphone audio and transmits it to a LiveKit room.
 - Receives audio from all participants, mixes it, and plays it locally.
 - RMS-based software mixer to maintain consistent output volume.
-- JACK and ALSA support.
+- JACK and miniaudio support.
 - Robust reconnection logic.
 
 ## Installation
@@ -35,7 +35,7 @@ go build -tags nojack -o livekit-pa
 
 ```bash
 ./livekit-pa \
-  --driver=alsa \
+  --driver=miniaudio \
   --host=wss://livekit.example.com \
   --api-key=your-api-key \
   --api-secret=your-api-secret \
@@ -49,7 +49,7 @@ go build -tags nojack -o livekit-pa
 
 | Flag           | Description                          |
 |----------------|--------------------------------------|
-| `--driver`     | Audio backend: `alsa` or `jack`      |
+| `--driver`     | Audio backend: `miniaudio` or `jack` |
 | `--host`       | LiveKit server URL                   |
 | `--api-key`    | LiveKit API key                      |
 | `--api-secret` | LiveKit API secret                   |
@@ -59,6 +59,6 @@ go build -tags nojack -o livekit-pa
 ## Project Structure
 
 - `main.go` – CLI and startup
-- `audio/` – ALSA and JACK audio clients
+- `audio/` – miniaudio and JACK audio clients
 - `livekit/` – LiveKit connection
 - `util/` – Retry and shutdown helpers
