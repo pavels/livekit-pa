@@ -1,5 +1,7 @@
 package audio
 
+import "fmt"
+
 type CircularBuffer struct {
 	buf       []int16
 	size      int
@@ -10,8 +12,8 @@ type CircularBuffer struct {
 	overflow  bool
 }
 
-func NewCircularBuffer() *CircularBuffer {
-	size := 960 * 8
+func NewCircularBuffer(size int) *CircularBuffer {
+	fmt.Printf("Alloc buffer %d\n", size)
 	return &CircularBuffer{buf: make([]int16, size), size: size, underflow: true, overflow: false}
 }
 

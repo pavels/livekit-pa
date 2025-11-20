@@ -92,13 +92,12 @@ func (lk *LiveKitClient) Disconnect() {
 }
 
 func (lk *LiveKitClient) handleRemoteTrack(track *webrtc.TrackRemote, participantID string) {
-	buf := audio.NewCircularBuffer()
 	decoder, err := opus.NewDecoder(48000, 1)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	lk.outputMixer.AddBuffer(participantID, buf)
+	buf := lk.outputMixer.AddBuffer(participantID)
 	defer lk.outputMixer.RemoveBuffer(participantID)
 
 	log.Println("Track Started -", track.ID())

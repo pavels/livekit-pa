@@ -20,14 +20,15 @@ func main() {
 	apiSecret := flag.String("api-secret", "", "LiveKit API secret")
 	roomName := flag.String("room", "", "Room name")
 	identity := flag.String("identity", "", "Participant identity")
+	bufferSize := flag.Int("buffer-size", 960*8, "Buffer size")
 	flag.Parse()
 
 	if *host == "" || *apiKey == "" || *apiSecret == "" || *roomName == "" || *identity == "" {
 		log.Fatal("All LiveKit parameters are required")
 	}
 
-	inputBuffer := audio.NewCircularBuffer()
-	outputMixer := audio.NewMixer()
+	inputBuffer := audio.NewCircularBuffer(*bufferSize)
+	outputMixer := audio.NewMixer(*bufferSize)
 
 	var err error
 	var client interface {

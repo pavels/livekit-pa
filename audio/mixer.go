@@ -7,19 +7,22 @@ import (
 
 type Mixer struct {
 	sync.Mutex
-	buffers map[string]*CircularBuffer
+	buffers    map[string]*CircularBuffer
+	bufferSize int
 }
 
-func NewMixer() *Mixer {
+func NewMixer(bufferSize int) *Mixer {
 	return &Mixer{
-		buffers: make(map[string]*CircularBuffer),
+		buffers:    make(map[string]*CircularBuffer),
+		bufferSize: bufferSize,
 	}
 }
 
-func (m *Mixer) AddBuffer(id string, buf *CircularBuffer) {
+func (m *Mixer) AddBuffer(id string) *CircularBuffer {
 	m.Lock()
 	defer m.Unlock()
-	m.buffers[id] = buf
+	m.buffers[id] = NewCircularBuffer(m.bufferSize)
+	return m.buffers[id]
 }
 
 func (m *Mixer) RemoveBuffer(id string) {
