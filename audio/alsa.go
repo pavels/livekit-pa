@@ -78,16 +78,43 @@ func (p *pcm) preparePcm() error {
 	return alsaError(C.int(errCode))
 }
 
-func (p *pcm) readi(buf []int32) int {
-	n := C.snd_pcm_readi(p.handle, unsafe.Pointer(&buf[0]), C.snd_pcm_uframes_t(len(buf)))
+func (p *pcm) readi(buf []int32) (bool, error) {
+	ret := C.snd_pcm_readi(p.handle, unsafe.Pointer(&buf[0]), C.snd_pcm_uframes_t(len(buf)))
+	if ret == -C.EPIPE {
+		fmt.Printf("Input EPIPE.\n")
+		err := p.preparePcm()
+		if err != nil {
+			return false, err
+		}
 
-	return int(n)
+		return false, nil
+	} else if ret < 0 {
+		return false, alsaError(C.int(ret))
+	}
+
+	return true, nil
 }
 
-func (p *pcm) writei(buf []int32) int {
-	n := C.snd_pcm_writei(p.handle, unsafe.Pointer(&buf[0]), C.snd_pcm_uframes_t(len(buf)))
+func (p *pcm) writei(buf []int32) (bool, error) {
+	offset := int64(0)
+	for offset < int64(len(buf)) {
+		wbuf := buf[offset:]
+		n := C.snd_pcm_writei(p.handle, unsafe.Pointer(&wbuf[0]), C.snd_pcm_uframes_t(len(wbuf)))
+		if n == -C.EPIPE {
+			// underrun: recover and retry
+			err := p.preparePcm()
+			if err != nil {
+				return false, err
+			}
+			offset = 0 // start writing current buffer from scratch
+			continue
+		} else if n < 0 {
+			return false, alsaError(C.int(n))
+		}
+		offset += int64(n)
+	}
 
-	return int(n)
+	return true, nil
 }
 
 func (p *pcm) close() {
@@ -159,6 +186,7 @@ func NewAlsaClient(device string, inputBuffer *CircularBuffer, outputMixer *Mixe
 func (ac *AlsaClient) process() {
 	inBuf := make([]int32, ac.pcmIn.period)
 	outBuf := make([]int32, ac.pcmOut.period)
+
 	for {
 		select {
 		case <-ac.quit:
@@ -167,40 +195,29 @@ func (ac *AlsaClient) process() {
 		default:
 		}
 
-		ret := ac.pcmIn.readi(inBuf)
-		if ret == -C.EPIPE {
-			fmt.Printf("Input EPIPE.\n")
-			err := ac.pcmIn.preparePcm()
-			if err != nil {
-				log.Fatalf(err.Error())
-			}
-
-			continue // Skip the rest
-		} else if ret < 0 {
-			log.Fatalf("Alsa read error: %s\n", alsaError(C.int(ret)).Error())
-		} else {
-			samples := make([]int16, ret)
-			for i := 0; i < ret; i++ {
-				samples[i] = int16(inBuf[i] >> 16)
-			}
-			ac.inputBuffer.Write(samples)
+		outSamples := ac.outputMixer.Read(ac.pcmOut.period)
+		for i := range outSamples {
+			outBuf[i] = int32(outSamples[i]) << 16
 		}
 
-		samples := ac.outputMixer.Read(ac.pcmOut.period)
-		for i := range samples {
-			outBuf[i] = int32(samples[i]) << 16
+		res, err := ac.pcmIn.readi(inBuf)
+		if err != nil {
+			log.Fatalf("Alsa read error: %s\n", err.Error())
 		}
-		ret = ac.pcmOut.writei(outBuf)
-		if ret == -C.EPIPE {
-			fmt.Printf("Output EPIPE.\n")
-			err := ac.pcmOut.preparePcm()
-			if err != nil {
-				log.Fatalf(err.Error())
-			}
-			ac.pcmOut.writei(outBuf)
-		} else if ret < 0 {
-			log.Fatalf("Alsa write error: %s\n", alsaError(C.int(ret)).Error())
+		if !res {
+			continue
 		}
+
+		_, err = ac.pcmOut.writei(outBuf)
+		if err != nil {
+			log.Fatalf("Alsa write error: %s\n", err.Error())
+		}
+
+		inSamples := make([]int16, ac.pcmIn.period)
+		for i := 0; i < len(inBuf); i++ {
+			inSamples[i] = int16(inBuf[i] >> 16)
+		}
+		ac.inputBuffer.Write(inSamples)
 	}
 }
 
