@@ -197,6 +197,7 @@ func (ac *AlsaClient) process() {
 			if err != nil {
 				log.Fatalf(err.Error())
 			}
+			ac.pcmOut.writei(outBuf)
 		} else if ret < 0 {
 			log.Fatalf("Alsa write error: %s\n", alsaError(C.int(ret)).Error())
 		}
