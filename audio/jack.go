@@ -50,7 +50,7 @@ func NewJackClient(name string, inputBuffer *CircularBuffer, outputMixer *Mixer)
 		}
 		jc.inputBuffer.Write(inSamples)
 
-		outSamples := jc.outputMixer.Read(int(nframes))
+		outSamples := jc.outputMixer.Read(uint64(nframes))
 		for i := range outSamples {
 			out[i] = int16ToAudioSample(outSamples[i])
 		}

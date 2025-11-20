@@ -1,67 +1,62 @@
 package audio
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
 type CircularBuffer struct {
-	buf       []int16
-	size      int
-	writeAt   int
-	readAt    int
-	count     int
-	underflow bool
-	overflow  bool
+	buf     []int16
+	size    uint64
+	writeAt uint64
+	readAt  uint64
+	count   uint64
+	sync    sync.Mutex
 }
 
-func NewCircularBuffer(size int) *CircularBuffer {
+func NewCircularBuffer(size uint64) *CircularBuffer {
 	fmt.Printf("Alloc buffer %d\n", size)
-	return &CircularBuffer{buf: make([]int16, size), size: size, underflow: true, overflow: false}
+	return &CircularBuffer{buf: make([]int16, size), size: size}
 }
 
 func (cb *CircularBuffer) Write(samples []int16) {
-	if cb.overflow {
-		return
-	}
+	cb.sync.Lock()
+	defer cb.sync.Unlock()
 
 	for _, s := range samples {
 		if cb.count < cb.size {
 			cb.buf[cb.writeAt] = s
 			cb.writeAt = (cb.writeAt + 1) % cb.size
 			cb.count++
-			if cb.underflow && cb.count > cb.size/2 {
-				cb.underflow = false
-			}
 		} else {
-			cb.overflow = true
+			// Overflow condition - flush everything and start over
+			fmt.Printf("Buffer overflow\n")
+			cb.Flush()
 			break
 		}
 	}
 }
 
-func (cb *CircularBuffer) Read(n int) []int16 {
+func (cb *CircularBuffer) Read(n uint64) []int16 {
+	cb.sync.Lock()
+	defer cb.sync.Unlock()
+
 	res := make([]int16, n)
 
-	if cb.underflow {
+	if cb.count < n*2 {
 		return res
 	}
 
-	for i := 0; i < n; i++ {
-		if cb.count > 0 {
-			res[i] = cb.buf[cb.readAt]
-			cb.readAt = (cb.readAt + 1) % cb.size
-			cb.count--
-			if cb.overflow && cb.count < cb.size/2 {
-				cb.overflow = false
-			}
-		} else {
-			cb.underflow = true
-			break
-		}
+	for i := uint64(0); i < n; i++ {
+		res[i] = cb.buf[cb.readAt]
+		cb.readAt = (cb.readAt + 1) % cb.size
+		cb.count--
 	}
 
 	return res
 }
 
-func (cb *CircularBuffer) Count() int {
+func (cb *CircularBuffer) Count() uint64 {
 	return cb.count
 }
 
@@ -69,6 +64,4 @@ func (cb *CircularBuffer) Flush() {
 	cb.readAt = 0
 	cb.writeAt = 0
 	cb.count = 0
-	cb.underflow = true
-	cb.overflow = false
 }

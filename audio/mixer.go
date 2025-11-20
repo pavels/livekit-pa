@@ -8,10 +8,10 @@ import (
 type Mixer struct {
 	sync.Mutex
 	buffers    map[string]*CircularBuffer
-	bufferSize int
+	bufferSize uint64
 }
 
-func NewMixer(bufferSize int) *Mixer {
+func NewMixer(bufferSize uint64) *Mixer {
 	return &Mixer{
 		buffers:    make(map[string]*CircularBuffer),
 		bufferSize: bufferSize,
@@ -31,7 +31,7 @@ func (m *Mixer) RemoveBuffer(id string) {
 	delete(m.buffers, id)
 }
 
-func (m *Mixer) Read(n int) []int16 {
+func (m *Mixer) Read(n uint64) []int16 {
 	m.Lock()
 	defer m.Unlock()
 	out := make([]int16, n)
@@ -63,7 +63,7 @@ func (m *Mixer) Read(n int) []int16 {
 
 	for id, samples := range sources {
 		weight := energies[id] / totalEnergy
-		for i := 0; i < n; i++ {
+		for i := uint64(0); i < n; i++ {
 			out[i] += int16(float64(samples[i]) * weight)
 		}
 	}

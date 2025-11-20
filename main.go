@@ -14,13 +14,13 @@ import (
 )
 
 func main() {
-	driver := flag.String("driver", "miniaudio", "audio driver: jack or miniaudio")
+	driver := flag.String("driver", "alsa", "audio driver: jack or alsa")
 	host := flag.String("host", "", "LiveKit server URL")
 	apiKey := flag.String("api-key", "", "LiveKit API key")
 	apiSecret := flag.String("api-secret", "", "LiveKit API secret")
 	roomName := flag.String("room", "", "Room name")
 	identity := flag.String("identity", "", "Participant identity")
-	bufferSize := flag.Int("buffer-size", 960*8, "Buffer size")
+	bufferSize := flag.Uint64("buffer-size", 4096, "Buffer size")
 	flag.Parse()
 
 	if *host == "" || *apiKey == "" || *apiSecret == "" || *roomName == "" || *identity == "" {
@@ -39,8 +39,8 @@ func main() {
 	switch *driver {
 	case "jack":
 		client, err = audio.NewJackClient("livekit-pa-"+*identity, inputBuffer, outputMixer)
-	case "miniaudio":
-		client, err = audio.NewMalgoClient(inputBuffer, outputMixer)
+	case "alsa":
+		client, err = audio.NewAlsaClient("default", inputBuffer, outputMixer)
 	default:
 		log.Fatalf("Unknown driver: %s", *driver)
 	}
