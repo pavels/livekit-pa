@@ -101,7 +101,7 @@ func (p *pcm) writei(buf []int32) (bool, error) {
 		wbuf := buf[offset:]
 		n := C.snd_pcm_writei(p.handle, unsafe.Pointer(&wbuf[0]), C.snd_pcm_uframes_t(len(wbuf)))
 		if n == -C.EPIPE {
-			// underrun: recover and retry
+			fmt.Printf("Output EPIPE.\n")
 			err := p.preparePcm()
 			if err != nil {
 				return false, err
