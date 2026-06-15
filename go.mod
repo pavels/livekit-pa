@@ -6,7 +6,6 @@ require (
 	github.com/livekit/protocol v1.32.2-0.20250206110518-331f97dbf4f3
 	github.com/livekit/server-sdk-go/v2 v2.5.0
 	github.com/pion/webrtc/v4 v4.0.14
-	github.com/xthexder/go-jack v0.0.0-20220805234212-bc8604043aba
 	gopkg.in/hraban/opus.v2 v2.0.0-20230925203106-0188a62cb302
 )
 
