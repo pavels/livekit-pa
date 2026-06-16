@@ -2,68 +2,78 @@ package audio
 
 import (
 	"fmt"
-	"sync"
+	"sync/atomic"
 )
 
+// CircularBuffer is a lockless single-producer single-consumer ring buffer.
+// Write must be called from exactly one goroutine; ReadInto from exactly one
+// (different) goroutine.
 type CircularBuffer struct {
-	buf     []int16
-	size    uint64
-	writeAt uint64
-	readAt  uint64
-	count   uint64
-	sync    sync.Mutex
+	buf          []int16
+	size         uint64
+	write        atomic.Uint64
+	read         atomic.Uint64
+	flushPending atomic.Bool
 }
 
 func NewCircularBuffer(size uint64) *CircularBuffer {
 	fmt.Printf("Alloc buffer %d\n", size)
-	return &CircularBuffer{buf: make([]int16, size), size: size}
-}
-
-func (cb *CircularBuffer) Write(samples []int16) {
-	cb.sync.Lock()
-	defer cb.sync.Unlock()
-
-	for _, s := range samples {
-		if cb.count < cb.size {
-			cb.buf[cb.writeAt] = s
-			cb.writeAt = (cb.writeAt + 1) % cb.size
-			cb.count++
-		} else {
-			// Overflow condition - flush everything and start over
-			fmt.Printf("Buffer overflow\n")
-			cb.Flush()
-			break
-		}
+	return &CircularBuffer{
+		buf:  make([]int16, size),
+		size: size,
 	}
 }
 
-// ReadInto fills out with samples from the buffer without allocating.
-// Writes silence if fewer than 2*len(out) samples are available.
-func (cb *CircularBuffer) ReadInto(out []int16) {
-	cb.sync.Lock()
-	defer cb.sync.Unlock()
+// Write appends samples from the producer. On overflow, signals the consumer
+// to flush stale data and drops the incoming batch.
+func (cb *CircularBuffer) Write(samples []int16) {
+	w := cb.write.Load()
+	r := cb.read.Load()
+	if uint64(len(samples)) > cb.size-(w-r) {
+		fmt.Printf("Buffer overflow\n")
+		cb.flushPending.Store(true)
+		return
+	}
+	for _, s := range samples {
+		cb.buf[w%cb.size] = s
+		w++
+	}
+	cb.write.Store(w)
+}
 
+// ReadInto fills out from the consumer without allocating. Writes silence if
+// fewer than 2*len(out) samples are buffered. Flushes stale data first if the
+// producer signalled an overflow.
+func (cb *CircularBuffer) ReadInto(out []int16) {
+	if cb.flushPending.Load() {
+		cb.read.Store(cb.write.Load())
+		cb.flushPending.Store(false)
+	}
+	w := cb.write.Load()
+	r := cb.read.Load()
 	n := uint64(len(out))
-	if cb.count < n*2 {
+	if w-r < n*2 {
 		for i := range out {
 			out[i] = 0
 		}
 		return
 	}
-
-	for i := uint64(0); i < n; i++ {
-		out[i] = cb.buf[cb.readAt]
-		cb.readAt = (cb.readAt + 1) % cb.size
-		cb.count--
+	for i := range out {
+		out[i] = cb.buf[r%cb.size]
+		r++
 	}
+	cb.read.Store(r)
 }
 
 func (cb *CircularBuffer) Count() uint64 {
-	return cb.count
+	return cb.write.Load() - cb.read.Load()
 }
 
+func (cb *CircularBuffer) Size() uint64 {
+	return cb.size
+}
+
+// Flush discards all buffered samples. Safe to call when the consumer is idle.
 func (cb *CircularBuffer) Flush() {
-	cb.readAt = 0
-	cb.writeAt = 0
-	cb.count = 0
+	cb.read.Store(cb.write.Load())
 }

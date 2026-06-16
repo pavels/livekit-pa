@@ -189,7 +189,7 @@ func NewAlsaClient(device string, inputBuffer *CircularBuffer, outputMixer *Mixe
 	fmt.Printf("Capture device period: %d\n", in.period)
 	fmt.Printf("Playback device period: %d\n", out.period)
 
-	if in.period > inputBuffer.size/4 || out.period > inputBuffer.size/4 {
+	if in.period > inputBuffer.Size()/4 || out.period > inputBuffer.Size()/4 {
 		return nil, fmt.Errorf("Internal buffer too small\n")
 	}
 
