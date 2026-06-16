@@ -15,6 +15,7 @@ import (
 type BufferedSampleProvider struct {
 	buffer  *audio.CircularBuffer
 	encoder *opus.Encoder
+	pcmBuf  []int16
 }
 
 func NewBufferedSampleProvider(buffer *audio.CircularBuffer) *BufferedSampleProvider {
@@ -26,6 +27,7 @@ func NewBufferedSampleProvider(buffer *audio.CircularBuffer) *BufferedSampleProv
 	return &BufferedSampleProvider{
 		buffer:  buffer,
 		encoder: encoder,
+		pcmBuf:  make([]int16, 960),
 	}
 }
 
@@ -34,10 +36,9 @@ func (b *BufferedSampleProvider) Close() error {
 }
 
 func (b *BufferedSampleProvider) NextSample(_ context.Context) (media.Sample, error) {
-	const frameSize = 960
-	pcm := b.buffer.Read(frameSize)
+	b.buffer.ReadInto(b.pcmBuf)
 	encoded := make([]byte, 4000)
-	n, err := b.encoder.Encode(pcm, encoded)
+	n, err := b.encoder.Encode(b.pcmBuf, encoded)
 	if err != nil {
 		return media.Sample{}, err
 	}

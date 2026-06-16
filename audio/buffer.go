@@ -37,23 +37,25 @@ func (cb *CircularBuffer) Write(samples []int16) {
 	}
 }
 
-func (cb *CircularBuffer) Read(n uint64) []int16 {
+// ReadInto fills out with samples from the buffer without allocating.
+// Writes silence if fewer than 2*len(out) samples are available.
+func (cb *CircularBuffer) ReadInto(out []int16) {
 	cb.sync.Lock()
 	defer cb.sync.Unlock()
 
-	res := make([]int16, n)
-
+	n := uint64(len(out))
 	if cb.count < n*2 {
-		return res
+		for i := range out {
+			out[i] = 0
+		}
+		return
 	}
 
 	for i := uint64(0); i < n; i++ {
-		res[i] = cb.buf[cb.readAt]
+		out[i] = cb.buf[cb.readAt]
 		cb.readAt = (cb.readAt + 1) % cb.size
 		cb.count--
 	}
-
-	return res
 }
 
 func (cb *CircularBuffer) Count() uint64 {

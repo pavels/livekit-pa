@@ -23,17 +23,20 @@ static int jackSetCallbacks(jack_client_t *client, void *arg) {
 import "C"
 import (
 	"fmt"
+	"log"
 	"runtime/cgo"
 	"unsafe"
 )
 
 type JackClient struct {
-	client      *C.jack_client_t
-	portIn      *C.jack_port_t
-	portOut     *C.jack_port_t
-	inputBuffer *CircularBuffer
-	outputMixer *Mixer
-	handle      cgo.Handle
+	client       *C.jack_client_t
+	portIn       *C.jack_port_t
+	portOut      *C.jack_port_t
+	inputBuffer  *CircularBuffer
+	outputMixer  *Mixer
+	handle       cgo.Handle
+	inputConvBuf []int16
+	outputBuf    []int16
 }
 
 //export goJackProcess
@@ -47,19 +50,16 @@ func goJackProcess(nframes C.jack_nframes_t, arg unsafe.Pointer) C.int {
 	inBuf := (*[1 << 20]C.jack_default_audio_sample_t)(inPtr)[:n:n]
 	outBuf := (*[1 << 20]C.jack_default_audio_sample_t)(outPtr)[:n:n]
 
-	inSamples := make([]int16, n)
+	inSamples := jc.inputConvBuf[:n]
 	for i, s := range inBuf {
 		inSamples[i] = audioSampleToInt16(float32(s))
 	}
 	jc.inputBuffer.Write(inSamples)
 
-	outSamples := jc.outputMixer.Read(uint64(n))
-	for i := range outBuf {
-		if i < len(outSamples) {
-			outBuf[i] = C.jack_default_audio_sample_t(int16ToAudioSample(outSamples[i]))
-		} else {
-			outBuf[i] = 0
-		}
+	outSamples := jc.outputBuf[:n]
+	jc.outputMixer.ReadInto(outSamples)
+	for i, s := range outSamples {
+		outBuf[i] = C.jack_default_audio_sample_t(int16ToAudioSample(s))
 	}
 
 	return 0
@@ -67,7 +67,7 @@ func goJackProcess(nframes C.jack_nframes_t, arg unsafe.Pointer) C.int {
 
 //export goJackShutdown
 func goJackShutdown(arg unsafe.Pointer) {
-	fmt.Println("JACK shutdown")
+	log.Fatal("JACK server shut down")
 }
 
 func NewJackClient(name string, inputBuffer *CircularBuffer, outputMixer *Mixer) (*JackClient, error) {
@@ -99,12 +99,15 @@ func NewJackClient(name string, inputBuffer *CircularBuffer, outputMixer *Mixer)
 		return nil, fmt.Errorf("jack_port_register failed")
 	}
 
+	bufSize := uint32(C.jack_get_buffer_size(client))
 	jc := &JackClient{
-		client:      client,
-		portIn:      portIn,
-		portOut:     portOut,
-		inputBuffer: inputBuffer,
-		outputMixer: outputMixer,
+		client:       client,
+		portIn:       portIn,
+		portOut:      portOut,
+		inputBuffer:  inputBuffer,
+		outputMixer:  outputMixer,
+		inputConvBuf: make([]int16, bufSize),
+		outputBuf:    make([]int16, bufSize),
 	}
 	jc.handle = cgo.NewHandle(jc)
 
@@ -125,6 +128,7 @@ func (jc *JackClient) Start() error {
 }
 
 func (jc *JackClient) Close() {
+	C.jack_deactivate(jc.client)
 	C.jack_client_close(jc.client)
 	jc.handle.Delete()
 }
