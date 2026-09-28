@@ -193,10 +193,11 @@ func NewAlsaClient(device string, inputBuffer *CircularBuffer, outputMixer *Mixe
 		return nil, fmt.Errorf("Internal buffer too small\n")
 	}
 
+	// Linking keeps capture and playback in sync, but many plugins
+	// (dmix/dsnoop, pulse, pipewire, ...) don't support it (ENOSYS),
+	// so fall back to running the streams unlinked.
 	if errCode := C.snd_pcm_link(in.handle, out.handle); errCode < 0 {
-		in.close()
-		out.close()
-		return nil, fmt.Errorf("pcm link: %w", alsaError(errCode))
+		log.Printf("pcm link not available, running unlinked: %s\n", alsaError(errCode))
 	}
 
 	err = in.preparePcm()
